@@ -4,29 +4,43 @@
 
 set -eu
 
-case "$1" in
-    -r) dest=/ ;;
-    -l) dest=. ;;
-    *) >&2 echo "Invalid extraction mode: must be either root (-r) or local (-l)."
-       exit 1
-    ;;
-esac
+parse_arguments() {
 
-shift
+    case "$1" in
+        -r) dest=/ ;;
+        -l) dest=. ;;
+        *) >&2 echo "Invalid extraction mode: must be either root (-r) or local (-l)."
+        exit 1
+        ;;
+    esac
 
-for url; do
-    download_dir=$(mktemp -d)
+    echo "$dest ${@:2}" # Throw extraction mode argument away
 
-    echo Downloading "$url"...
-    wget -P $download_dir "$url" &> /tmp/wget.log || (cat /tmp/wget.log && false)
+}
 
-    filename=$(basename $download_dir/*)
+download () {
 
-    if [[ ${filename,,} == *".zip" ]]; then
-        unzip -qo $download_dir/$filename -d $dest
-    else
-        tar --no-same-owner -xf $download_dir/$filename -C $dest
-    fi
+    dest=$1
+    shift
 
-    rm -rf $download_dir /tmp/wget.log
-done
+    for url; do
+        download_dir=$(mktemp -d)
+
+        echo Downloading "$url"...
+        wget -P $download_dir "$url" &> /tmp/wget.log || (cat /tmp/wget.log && false)
+
+        filename=$(basename $download_dir/*)
+
+        if [[ ${filename,,} == *".zip" ]]; then
+            unzip -qo $download_dir/$filename -d $dest
+        else
+            tar --no-same-owner -xf $download_dir/$filename -C $dest
+        fi
+
+        rm -rf $download_dir /tmp/wget.log
+    done
+
+}
+
+args=$(parse_arguments ${@})
+download ${args}
